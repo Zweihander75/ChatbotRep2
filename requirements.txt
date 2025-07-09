@@ -4,5 +4,6 @@ protobuf==3.20.3
 google-generativeai>=0.3.0
 setuptools>=60.0.0
 streamlit
+streamlit_authenticator
 pandas
 gtts
