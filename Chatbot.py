@@ -54,7 +54,7 @@ def load_credentials_from_db(db_path):
         }
     return credentials
 
-with open('C:\\Users\\User\\Desktop\\prueba chatbo ai\\config.yaml') as file:
+with open('config.yaml') as file:
     config = yaml.load(file, Loader=SafeLoader)
 
 authenticator = stauth.Authenticate(
