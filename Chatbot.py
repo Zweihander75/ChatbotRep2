@@ -66,8 +66,8 @@ authenticator = stauth.Authenticate(
 
 fields = {
     "Form name": "Iniciar sesión",
-    "Username": "Usuario",
-    "Password": "Contraseña",
+    "Username": "Usuario (roibert)",
+    "Password": "Contraseña (abc)",
     "Login": "Entrar"
 }
 
