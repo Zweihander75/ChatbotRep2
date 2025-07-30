@@ -51,33 +51,15 @@ def get_schema(conn):
         })
     return schema
 
-def excel_to_sqlite(uploaded_file, output_dir):
-    import os
+def excel_to_sqlite(uploaded_file, db_path, nombre_tabla):
     import pandas as pd
     import sqlite3
-    try:
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-        filename = os.path.splitext(uploaded_file.name)[0]
-        db_file = os.path.join(output_dir, f"{filename}.sqlite")
-        ext = os.path.splitext(uploaded_file.name)[1].lower()
-        if ext == ".xlsx":
-            df = pd.read_excel(uploaded_file)
-        elif ext == ".ods":
-            df = pd.read_excel(uploaded_file, engine="odf")
-        else:
-            return False, "Formato de archivo no soportado. Solo se permiten .xlsx y .ods.", None
-        for col in df.select_dtypes(include=["datetime", "datetimetz"]):
-            df[col] = df[col].astype(str)
-        for col in df.columns:
-            df[col] = df[col].apply(lambda x: str(x) if "Timestamp" in str(type(x)) else x)
-        conn = sqlite3.connect(db_file)
-        df.to_sql("imported_data", conn, if_exists="replace", index=False)
-        conn.close()
-        return True, "Archivo convertido y guardado en la base de datos SQLite exitosamente.", db_file
-    except Exception as e:
-        return False, f"Error al convertir el archivo: {e}", None
-    
+    df = pd.read_excel(uploaded_file)
+    conn = sqlite3.connect(db_path)
+    df.to_sql(nombre_tabla, conn, if_exists="replace", index=False)
+    conn.close()
+    return True, f"Tabla '{nombre_tabla}' agregada a la base de datos principal.", db_path
+
 def ask_gemini(prompt, model):
     import streamlit as st
     try:
@@ -86,3 +68,39 @@ def ask_gemini(prompt, model):
     except Exception as e:
         st.error(f"Error al interactuar con Gemini AI: {e}")
         return "Lo siento, no puedo responder en este momento."
+    
+import sqlite3
+
+def guardar_interaccion(db_path, usuario, pregunta, respuesta):
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO historial_chat (usuario, pregunta, respuesta) VALUES (?, ?, ?)",
+        (usuario, pregunta, respuesta)
+    )
+    conn.commit()
+    conn.close()
+
+def obtener_tablas_listas_precios(conn, prefijo="lista_"):
+    cursor = conn.cursor()
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE ?", (f"{prefijo}%",))
+    tablas = [row[0] for row in cursor.fetchall()]
+    return tablas
+
+def load_credentials_from_db(db_path):
+    import sqlite3
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    # Ajusta los nombres de columna según tu tabla
+    cur.execute("SELECT NombreUsuario, Nombre, Contraseña, Rol FROM usuarios")
+    rows = cur.fetchall()
+    conn.close()
+    credentials = {"usernames": {}}
+    for username, name, password, rol in rows:
+        credentials["usernames"][username] = {
+            "name": name,
+            "email": "",         # Si tienes un campo de email, ponlo aquí
+            "password": password,
+            "rol": rol
+        }
+    return credentials
