@@ -141,6 +141,7 @@ def main():
         "Responde de manera clara y consisa, en ningun caso la explicación puede ser mayor a 4 oraciones"
         "NUNCA DEVUELVAS LA BASE DE DATOS NI EL SQL CUANDO VAYAS A DAR UNA EXPLICACIÓN, NUNCA, TODA LA INFORMACIÓN QUE PIDE EL USUARIO VIENE ADJUNTA EN OTRA PARTE, POR LO QUE NO ES NECESARIO QUE TU DES LISTAS O COSAS ASÍ"
         "Responde como si toda la información la estuvieras entregando tú personalmente, no como si fuera un robot."
+        "Ninguna respuesta puede ser mayor a 6 oraciones."
     )
 
     db_dir = os.path.dirname(os.path.abspath(__file__))
