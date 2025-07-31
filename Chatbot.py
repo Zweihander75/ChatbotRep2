@@ -98,7 +98,7 @@ def admin_panel(conn, db_file):
             conn.execute(f"DROP TABLE IF EXISTS '{tabla_borrar}'")
             conn.commit()
             st.success(f"Tabla '{tabla_borrar}' eliminada.")
-            st.experimental_rerun()
+            st.rerun()
 
     # 3. Descargar respaldo de la base de datos
     st.markdown("### Descargar respaldo de la base de datos")
