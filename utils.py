@@ -43,7 +43,8 @@ def get_schema(conn):
     schema = []
     for table in tables:
         table_name = table[0]
-        cursor.execute(f"PRAGMA table_info({table_name});")
+        # Poner el nombre de la tabla entre comillas dobles para evitar errores con caracteres especiales
+        cursor.execute(f'PRAGMA table_info("{table_name}");')
         columns = cursor.fetchall()
         schema.append({
             "table": table_name,
