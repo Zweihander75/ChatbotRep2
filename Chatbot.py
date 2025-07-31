@@ -1,11 +1,11 @@
 import streamlit as st
 import streamlit_authenticator as stauth
 import google.generativeai as genai
-from langchain.sql_database import SQLDatabase
 import pandas as pd
 import os
 from utils import create_connection, execute_query, get_schema, excel_to_sqlite, ask_gemini, obtener_tablas_listas_precios, guardar_interaccion, load_credentials_from_db
 import base64
+import datetime
 
 st.set_page_config(page_title="Chatbot SQLite con Gemini", page_icon="🤖")
 
@@ -37,16 +37,16 @@ def reproducir_audio(texto, lang='es', playback_rate=1.5):
     st.components.v1.html(audio_html, height=0)
 
 db_dir = os.path.dirname(os.path.abspath(__file__))
-db_file = os.path.join(db_dir, "Main.sqlite")  # Usa tu base de datos principal
+db_file = os.path.join(db_dir, "Main.sqlite")  # Base de datos principal
 
 # Carga credenciales desde la base de datos
 credentials = load_credentials_from_db(db_file)
 
 authenticator = stauth.Authenticate(
     credentials,
-    "cookie_name",  # Puedes poner el nombre que quieras
-    "cookie_key",   # Puedes poner el key que quieras
-    30              # Días de expiración de la cookie
+    "cookie_name",  
+    "cookie_key",   
+    1               # Días de expiración de la cookie
 )
 
 fields = {
@@ -56,7 +56,6 @@ fields = {
     "Login": "Entrar"
 }
 
-# Llama SIEMPRE al login
 authenticator.login('main', fields=fields)
 
 authentication_status = st.session_state.get('authentication_status', None)
@@ -81,13 +80,7 @@ GEMINI_API_KEY = "AIzaSyBV4RlXzi2iRzi-_syqxH8HBfDY2aGgx3E"
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel('gemini-2.0-flash-lite')
 
-try:
-    db = SQLDatabase.from_uri("sqlite:///lista de precios jd.sqlite")
-except Exception as e:
-    st.error(f"Error al conectar con la base de datos: {e}")
-
-# ...existing code...
-
+# Función para el panel de administración
 def admin_panel(conn, db_file):
     st.subheader("👑 Panel de Administración")
 
@@ -107,11 +100,23 @@ def admin_panel(conn, db_file):
             st.success(f"Tabla '{tabla_borrar}' eliminada.")
             st.experimental_rerun()
 
+    # 3. Descargar respaldo de la base de datos
+    st.markdown("### Descargar respaldo de la base de datos")
+    now = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    backup_filename = f"main_{now}.sqlite"
+    with open(db_file, "rb") as f:
+        st.download_button(
+            label="Descargar respaldo",  # Solo el texto simple
+            data=f,
+            file_name=backup_filename,
+            mime="application/octet-stream"
+        )
+
 def main():
     db_dir = os.path.dirname(os.path.abspath(__file__))
-    db_file = os.path.join(db_dir, "Main.sqlite")  # Nombre de la base de datos principal
+    db_file = os.path.join(db_dir, "Main.sqlite")  # Base de datos principal
 
-    # Centrar la imagen y mostrarla usando base64 para que siempre se vea
+    # Imagen del chatbot
     img_path = os.path.join(db_dir, "bot-conversacional-abierta.png")
     if os.path.exists(img_path):
         with open(img_path, "rb") as img_file:
@@ -148,6 +153,8 @@ def main():
         authenticator.logout('Cerrar sesión', 'main')
         if name:
             st.success(f'Bienvenido, {name}!')
+        # Switch para modo debug
+        debug_mode = st.toggle("Modo Debug", value=False, key="debug_mode")
         st.subheader("📂 Convertir archivo Excel a SQLite")
         uploaded_file = st.file_uploader("Sube un archivo Excel u ODS para convertirlo a SQLite", type=["xlsx", "ods"])
         if uploaded_file:
@@ -178,22 +185,26 @@ def main():
         else:
             tabla_seleccionada = st.selectbox("Selecciona una lista de precios:", tablas_listas)
 
-        if conn:
-            st.success("✅ Conexión exitosa a la base de datos.")
-
     if conn and tabla_seleccionada:
         results = None
         suggestions = None
         schema = get_schema(conn)
         # Filtrar solo la tabla seleccionada
         tabla_actual = next((t for t in schema if t['table'] == tabla_seleccionada), None)
-        with st.expander("📊 Ver estructura de la tabla seleccionada"):
-            if tabla_actual:
-                st.write(f"**Tabla: {tabla_actual['table']}**")
-                st.write(f"Columnas: {', '.join(tabla_actual['columns'])}")
-            else:
-                st.info("No se encontró la estructura de la tabla seleccionada.")
 
+        # Mostrar estructura de la tabla solo si debug_mode está activado
+        if 'debug_mode' in st.session_state and st.session_state['debug_mode']:
+            show_structure = True
+        else:
+            show_structure = False
+
+        if show_structure:
+            with st.expander("📊 Ver estructura de la tabla seleccionada"):
+                if tabla_actual:
+                    st.write(f"**Tabla: {tabla_actual['table']}**")
+                    st.write(f"Columnas: {', '.join(tabla_actual['columns'])}")
+                else:
+                    st.info("No se encontró la estructura de la tabla seleccionada.")
 
         user_question = st.text_input("Haz una pregunta sobre la lista de precios seleccionada (ej: ¿Cuál es el producto más caro?):")
 
@@ -271,8 +282,10 @@ def main():
                             df = pd.DataFrame(results)
                     else:
                         df = pd.DataFrame()
-                    with st.expander("📝 Consulta generada (SQL)"):
-                        st.code(sql_query, language="sql")
+                    # Mostrar SQL generado solo si debug_mode está activado
+                    if show_structure:
+                        with st.expander("📝 Consulta generada (SQL)"):
+                            st.code(sql_query, language="sql")
                     with st.expander("📋 Ver resultados de la consulta"):
                         st.markdown(
                             """
@@ -307,8 +320,10 @@ def main():
                     reproducir_audio(explanation)
                     guardar_interaccion(db_file, name, user_question, explanation)
                 else:
-                    with st.expander("📝 Consulta generada (SQL)"):
-                        st.code(sql_query, language="sql")
+                    # Mostrar SQL generado solo si debug_mode está activado
+                    if show_structure:
+                        with st.expander("📝 Consulta generada (SQL)"):
+                            st.code(sql_query, language="sql")
                     explanation_prompt = f"""
                     No se encontraron resultados para la consulta SQL generada:
                     Comportate de la siguiente manera: {role_prompt}

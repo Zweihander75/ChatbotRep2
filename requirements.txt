@@ -7,3 +7,4 @@ streamlit
 streamlit_authenticator
 pandas
 gtts
+openpyxl
