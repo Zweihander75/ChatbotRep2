@@ -9,10 +9,10 @@ import datetime
 
 st.set_page_config(page_title="Chatbot SQLite con Gemini", page_icon="🤖")
 
-def reproducir_audio(texto, lang='es', playback_rate=1.5):
-    """
-    Convierte texto a voz, lo reproduce en Streamlit y lo oculta visualmente.
-    """
+#################### Texto a voz #############################
+
+def reproducir_audio(texto, lang='es', playback_rate=1.5):    
+    
     import io
     from gtts import gTTS
     tts = gTTS(text=texto, lang=lang)
@@ -36,17 +36,20 @@ def reproducir_audio(texto, lang='es', playback_rate=1.5):
     """
     st.components.v1.html(audio_html, height=0)
 
+#################### Conección a base de datos #############################
+
 db_dir = os.path.dirname(os.path.abspath(__file__))
 db_file = os.path.join(db_dir, "Main.sqlite")  # Base de datos principal
 
-# Carga credenciales desde la base de datos
+#################### Carga de credenciales/Login #############################
+
 credentials = load_credentials_from_db(db_file)
 
 authenticator = stauth.Authenticate(
     credentials,
     "cookie_name",  
     "cookie_key",   
-    1               # Días de expiración de la cookie
+    1               
 )
 
 fields = {
@@ -78,7 +81,8 @@ else:
 GEMINI_API_KEY = "AIzaSyBV4RlXzi2iRzi-_syqxH8HBfDY2aGgx3E"
 
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-2.0-flash-lite')
+# Usar el modelo seleccionado en el sidebar
+model = genai.GenerativeModel(st.session_state.get("modelo_gemini", "gemini-2.0-flash"))
 
 # Función para el panel de administración
 def admin_panel(conn, db_file):
@@ -106,7 +110,7 @@ def admin_panel(conn, db_file):
     backup_filename = f"main_{now}.sqlite"
     with open(db_file, "rb") as f:
         st.download_button(
-            label="Descargar respaldo",  # Solo el texto simple
+            label="Descargar respaldo",
             data=f,
             file_name=backup_filename,
             mime="application/octet-stream"
@@ -154,10 +158,64 @@ def main():
         authenticator.logout('Cerrar sesión', 'main')
         if name:
             st.success(f'Bienvenido, {name}!')
+        # Selector de modelo de IA
+        modelo_gemini = st.selectbox(
+            "Modelo de IA",
+            ["gemini-2.0-flash-lite", "gemini-2.0-flash", "gemini-2.5-flash-lite", "gemini-2.5-flash", "gemini-2.5-pro"],
+            index=0,
+            key="modelo_gemini"
+        )
         # Switch para modo debug
         debug_mode = st.toggle("Modo Debug", value=False, key="debug_mode")
+
         st.subheader("📂 Convertir archivo Excel a SQLite")
-        uploaded_file = st.file_uploader("Sube un archivo Excel u ODS para convertirlo a SQLite", type=["xlsx", "ods"])
+
+        # CSS para traducir los textos del widget de subida de archivos
+        custom_css = """
+        <style>
+
+        /* Solo cambia el texto del botón dentro del uploader */
+        section[data-testid="stFileUploaderDropzone"] > button[data-testid="stBaseButton-secondary"] {
+            color: transparent !important;
+            position: relative;
+        }
+        section[data-testid="stFileUploaderDropzone"] > button[data-testid="stBaseButton-secondary"]::after {
+            content: "Buscar archivo";
+            color: white;
+            position: absolute;
+            left: 0; right: 0; top: 0; bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        /* Cambia la instrucción principal */
+        div[data-testid="stFileUploaderDropzoneInstructions"] span.st-emotion-cache-9ycgxx {
+            visibility: hidden;
+        }
+        div[data-testid="stFileUploaderDropzoneInstructions"]>div>span::after {
+            content: "Subir archivo";
+            visibility: visible;
+            display: block;
+        }
+        /* Cambia el texto del límite de archivo */
+        div[data-testid="stFileUploaderDropzoneInstructions"] small {
+            visibility: hidden;
+        }
+        div[data-testid="stFileUploaderDropzoneInstructions"] small::before {
+            content: "Límite de 200MB";
+            visibility: visible;
+            display: block;
+        }
+        </style>
+        """
+
+        st.markdown(custom_css, unsafe_allow_html=True)
+
+        uploaded_file = st.file_uploader(
+            label="Selecciona el archivo Excel o ODS",
+            type=["xlsx", "ods"]
+        )
+        
         if uploaded_file:
             # Obtener el nombre del archivo sin extensión y reemplazar espacios por "_"
             nombre_tabla = os.path.splitext(uploaded_file.name)[0].replace(" ", "_")

@@ -42,8 +42,7 @@ def get_schema(conn):
     tables = cursor.fetchall()
     schema = []
     for table in tables:
-        table_name = table[0]
-        # Poner el nombre de la tabla entre comillas dobles para evitar errores con caracteres especiales
+        table_name = table[0]        
         cursor.execute(f'PRAGMA table_info("{table_name}");')
         columns = cursor.fetchall()
         schema.append({
@@ -92,15 +91,14 @@ def load_credentials_from_db(db_path):
     import sqlite3
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
-    # Ajusta los nombres de columna según tu tabla
+
     cur.execute("SELECT NombreUsuario, Nombre, Contraseña, Rol FROM usuarios")
     rows = cur.fetchall()
     conn.close()
     credentials = {"usernames": {}}
     for username, name, password, rol in rows:
         credentials["usernames"][username] = {
-            "name": name,
-            "email": "",         # Si tienes un campo de email, ponlo aquí
+            "name": name,           
             "password": password,
             "rol": rol
         }
