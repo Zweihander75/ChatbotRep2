@@ -8,3 +8,4 @@ streamlit_authenticator
 pandas
 gtts
 openpyxl
+xlsxwriter

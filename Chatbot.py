@@ -173,8 +173,7 @@ def main():
         # CSS para traducir los textos del widget de subida de archivos
         custom_css = """
         <style>
-
-        /* Solo cambia el texto del botón dentro del uploader */
+        /* Botón del uploader: texto original transparente, texto nuevo encima */
         section[data-testid="stFileUploaderDropzone"] > button[data-testid="stBaseButton-secondary"] {
             color: transparent !important;
             position: relative;
@@ -187,24 +186,37 @@ def main():
             display: flex;
             align-items: center;
             justify-content: center;
+            pointer-events: none;
         }
-        /* Cambia la instrucción principal */
+        /* Instrucción principal: texto original transparente, texto nuevo encima */
         div[data-testid="stFileUploaderDropzoneInstructions"] span.st-emotion-cache-9ycgxx {
-            visibility: hidden;
+            color: transparent !important;
+            position: relative;
         }
-        div[data-testid="stFileUploaderDropzoneInstructions"]>div>span::after {
+        div[data-testid="stFileUploaderDropzoneInstructions"] > div > span::after {
             content: "Subir archivo";
-            visibility: visible;
-            display: block;
+            color: white;
+            position: absolute;
+            left: 0; right: 0; top: 0; bottom: 0;
+            
+            align-items: left;
+            justify-content: left;
+            pointer-events: none;
         }
-        /* Cambia el texto del límite de archivo */
+        /* Texto del límite de archivo: original transparente, nuevo encima */
         div[data-testid="stFileUploaderDropzoneInstructions"] small {
-            visibility: hidden;
+            color: transparent !important;
+            position: relative;
         }
         div[data-testid="stFileUploaderDropzoneInstructions"] small::before {
             content: "Límite de 200MB";
-            visibility: visible;
-            display: block;
+            color: white;
+            position: absolute;
+            left: 0; right: 0; top: 0; bottom: 0;
+            
+            align-items: left;
+            justify-content: left;
+            pointer-events: none;
         }
         </style>
         """
@@ -244,6 +256,39 @@ def main():
         else:
             tabla_seleccionada = st.selectbox("Selecciona una lista de precios:", tablas_listas)
 
+            # --- Botón para descargar la lista seleccionada como Excel ---
+            if tabla_seleccionada:
+                import io
+                import pandas as pd
+
+                df_lista = pd.read_sql_query(f'SELECT * FROM "{tabla_seleccionada}"', conn)
+                output = io.BytesIO()
+                now = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                excel_filename = f"{tabla_seleccionada}_{now}.xlsx"
+
+                # Escribir el DataFrame con formato usando xlsxwriter
+                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                    df_lista.to_excel(writer, index=False, sheet_name='Lista')
+                    workbook  = writer.book
+                    worksheet = writer.sheets['Lista']
+
+                    # Formato para encabezados
+                    header_format = workbook.add_format({'bold': True, 'bg_color': '#DDEBF7', 'border': 1})
+                    for col_num, value in enumerate(df_lista.columns.values):
+                        worksheet.write(0, col_num, value, header_format)
+                        # Ajustar ancho de columna según el contenido
+                        max_len = max(df_lista[value].astype(str).map(len).max(), len(str(value))) + 2
+                        worksheet.set_column(col_num, col_num, max_len)
+
+                    # Agregar autofiltro
+                    worksheet.autofilter(0, 0, len(df_lista), len(df_lista.columns) - 1)
+
+                st.download_button(
+                    label="Descargar lista en Excel",
+                    data=output.getvalue(),
+                    file_name=excel_filename,
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
     if conn and tabla_seleccionada:
         results = None
         suggestions = None

@@ -51,14 +51,38 @@ def get_schema(conn):
         })
     return schema
 
-def excel_to_sqlite(uploaded_file, db_path, nombre_tabla):
+def excel_to_sqlite(uploaded_file, db_path, nombre_tabla, encabezados_esperados=None):
     import pandas as pd
     import sqlite3
-    df = pd.read_excel(uploaded_file)
+
+    # Lista de encabezados sugeridos (puedes agregar más)
+    if encabezados_esperados is None:
+        encabezados_esperados = ["Producto", "Precio", "Código", "Descripción", "COD", "DESCRIPCION", "MARCA"]
+
+    # Lee el archivo sin encabezados para analizar las filas
+    df_raw = pd.read_excel(uploaded_file, header=None)
+    header_row = None
+
+    # Busca la primera fila que tenga al menos una coincidencia parcial con los encabezados esperados
+    for i, row in df_raw.iterrows():
+        row_str = [str(cell).strip().lower() for cell in row]
+        coincidencias = [enc for enc in encabezados_esperados if any(enc.lower() in cell for cell in row_str)]
+        if len(coincidencias) > 0:
+            header_row = i
+            break
+
+    if header_row is None:
+        return False, "No se encontraron encabezados válidos en el archivo.", db_path
+
+    # Aplica el prefijo "lista_" al nombre de la tabla
+    nombre_tabla_prefijo = f"lista_{nombre_tabla}"
+
+    # Lee el archivo usando la fila detectada como encabezado
+    df = pd.read_excel(uploaded_file, header=header_row)
     conn = sqlite3.connect(db_path)
-    df.to_sql(nombre_tabla, conn, if_exists="replace", index=False)
+    df.to_sql(nombre_tabla_prefijo, conn, if_exists="replace", index=False)
     conn.close()
-    return True, f"Tabla '{nombre_tabla}' agregada a la base de datos principal.", db_path
+    return True, f"Tabla '{nombre_tabla_prefijo}' agregada a la base de datos principal.", db_path
 
 def ask_gemini(prompt, model):
     import streamlit as st
